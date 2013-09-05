@@ -34,10 +34,18 @@ class testHTTPHandler (BaseHTTPServer.BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.headers.has_key("Content-Type"):
             self.send_response(500)
-            self.wfile.write("needs content type\r\n")
             self.end_headers()
+            self.wfile.write("Needs Content-Type\n")
             return
-         
+        
+        if self.headers['Content-Type'].find('form') == -1:
+            self.send_response(200)
+            self.end_headers()
+            varLen = int(self.headers['Content-Length'])
+            postVars = self.rfile.read(varLen)
+            self.wfile.write('POST_%s length=%s\n' % (self.headers['Content-Type'], varLen))
+            return
+                         
         form = cgi.FieldStorage(fp = self.rfile,
                                 headers = self.headers,
                                 environ = {'REQUEST_METHOD':    'POST',
@@ -46,7 +54,7 @@ class testHTTPHandler (BaseHTTPServer.BaseHTTPRequestHandler):
         if len(form) == 0:
             self.send_response(200)
             self.end_headers()
-            self.wfile.write("NO_FORM_DATA found")
+            self.wfile.write("NO_FORM_DATA found\n")
             return
          
         self.send_response(200)
@@ -81,10 +89,27 @@ class testHTTPServer(threading.Thread):
     def isReady(self):
         return self.is_ready
 
+httpd = None
 def main():
+    global httpd
+
+    import signal
+    import traceback
+    def receive_signal(signum, stack):
+        print '[main] Received signal:', signum
+        print '[main] Current stack:'
+        traceback.print_stack(stack)
+
+        httpd.die()
+        httpd.join()
+        sys.exit(0)
+
+    
+    signal.signal(signal.SIGINT, receive_signal)
+    
     listen_port_start = 32800
     for listen_port in range(listen_port_start, listen_port_start + 2):
-        print "trying to bind on port %s" % listen_port
+        print "[main] trying to bind on port %s" % listen_port
         httpd = testHTTPServer('127.0.0.1', listen_port, )
         try:
             httpd.listen()
@@ -99,10 +124,12 @@ def main():
                 sys.exit(-1)
 
     httpd.start()
-    print "started on port", listen_port
+    print "[main] started on port", listen_port
     try:
-        time.sleep(30)
+        time.sleep(9999999.)
+        print '[main] Time is up'
     except KeyboardInterrupt:
+        print '[main] Keyboard Interrupt'
         pass
     httpd.die()
     httpd.join()

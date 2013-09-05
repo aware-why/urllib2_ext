@@ -202,7 +202,15 @@ def send_data(v_vars, v_files, boundary, sock=None):
     return buffer_len
 
 # mainly a copy of HTTPHandler from urllib2
-class newHTTPHandler(urllib2.BaseHandler):
+class newHTTPHandler(urllib2.HTTPHandler):
+    """
+    Custom http handler to handle with the multipart/form-data POST request
+    """
+    
+    def http_request(self, request):
+        ## The new http handler not use the builtin AbstractHTTPHandler._do_request in urlib2
+        return request
+        
     def http_open(self, req):
         return self.do_open(httplib.HTTP, req)
 
@@ -284,7 +292,7 @@ class newHTTPHandler(urllib2.BaseHandler):
                 data = urllib.urlencode(v_vars)
                 h.send(data)
             else:
-                # "normal" urllib2.urlopen()
+                # Normal case, single data (mostly string)
                 h.send(data)
 
         code, msg, hdrs = h.getreply()
@@ -297,12 +305,13 @@ class newHTTPHandler(urllib2.BaseHandler):
         else:
             return self.parent.error('http', req, fp, code, msg, hdrs)
 
-urllib2._old_HTTPHandler = urllib2.HTTPHandler
-urllib2.HTTPHandler = newHTTPHandler
-
 class newHTTPSHandler(newHTTPHandler):
     def https_open(self, req):
         return self.do_open(httplib.HTTPS, req)
     
-urllib2.HTTPSHandler = newHTTPSHandler
+
+## Expose the handler for user to use urllib2.build_opener to generate a temporary opener,
+# print dir(urllib2.HTTPHandler)
+# print dir(newHTTPHandler)
+new_httphandler = newHTTPHandler
 
